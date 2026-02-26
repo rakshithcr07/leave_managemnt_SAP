@@ -1,9 +1,2 @@
 {
-    "actions": [
-        {
-            "id": "openReadmeFile",
-            "actionType": "FILE",
-            "uri": "file:///home/user/projects/leave-mangement/.gen/generation.log"
-        }
-    ]
 }
