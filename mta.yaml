@@ -1,0 +1,144 @@
+_schema-version: 3.3.0
+ID: leave-mangement
+version: 1.0.0
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+modules:
+  - name: leave-mangement-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: leave-mangement-auth
+      - name: leave-mangement-db
+      - name: leave-mangement-connectivity
+      - name: leave-mangement-destination
+
+  - name: leave-mangement-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: leave-mangement-db
+  - name: leave-mangement
+    type: approuter.nodejs
+    path: app/router
+    parameters:
+      keep-existing-routes: true
+      disk-quota: 256M
+      memory: 256M
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api # must be used in xs-app.json as well
+          url: ~{srv-url}
+          forwardAuthToken: true
+      - name: leave-mangement-auth
+      - name: leave-mangement-destination
+      - name: leave-mangement-html5-runtime
+      - name: leave-mangement-portal
+    provides:
+      - name: app-api
+        properties:
+          app-protocol: ${protocol}
+          app-uri: ${default-uri}
+
+  - name: leave-mangement-app-deployer
+    type: com.sap.application.content
+    path: gen
+    requires:
+      - name: leave-mangement-auth
+      - name: srv-api
+      - name: leave-mangement-html5-repo-host
+        parameters:
+          content-target: true
+          config:
+            HTML5Runtime_enabled: true
+    build-parameters:
+      build-result: app/
+      requires:
+
+
+  - name: leave-mangement-portal-deployer
+    type: com.sap.application.content
+    path: app/portal
+    requires:
+      - name: leave-mangement-portal
+        parameters:
+          content-target: true
+          service-key:
+            name: leave-mangement-portal-key
+            config:
+              content-endpoint: developer
+      - name: leave-mangement-auth
+      - name: leave-mangement-html5-repo-host
+      - name: leave-mangement-app-deployer
+    deployed-after:
+      - leave-mangement-app-deployer
+resources:
+  - name: leave-mangement-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: leave-mangement-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+          redirect-uris:
+            - https://*~{app-api/app-uri}/**
+    requires:
+      - name: app-api
+  - name: leave-mangement-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: leave-mangement-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite
+  - name: leave-mangement-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+
+  - name: leave-mangement-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+  - name: leave-mangement-html5-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime
+  - name: leave-mangement-portal
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: portal
+      service-plan: standard
