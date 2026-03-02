@@ -1,5 +1,6 @@
 
-@baseUrl = http://localhost:50140
+@baseUrl = http://localhost:4004
+
 
 @employeeAuth = Basic ZW1wbG95ZWUxQHRlc3QuY29tOjEyMzQ1Njc4
 @managerAuth  = Basic bWFuYWdlcjFAdGVzdC5jb206MTIzNDU2Nzg=
